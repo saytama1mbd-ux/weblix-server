@@ -1,3 +1,6 @@
+// Load environment variables first (সবচেয়ে শুরুতে)
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
@@ -12,6 +15,14 @@ app.use(express.json());
 // Store OTPs in memory
 const otpStore = new Map();
 
+// Check if email credentials are configured
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error('❌ EMAIL_USER or EMAIL_PASS environment variables are not set!');
+    console.error('Please create .env file or set them in Render Dashboard');
+} else {
+    console.log('✅ Email credentials loaded from .env file');
+}
+
 // Rate limiting
 const emailLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -19,12 +30,12 @@ const emailLimiter = rateLimit({
     message: { success: false, error: 'Too many requests. Please wait a minute.' }
 });
 
-// Email configuration (YOUR credentials are set here)
+// Email configuration (Environment Variable ব্যবহার করে)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'mdshihab999777@gmail.com',
-        pass: 'wyzcaotqkgqivzdo'
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
 });
 
@@ -36,7 +47,7 @@ function generateOTP() {
 // Send email with OTP
 async function sendOTPEmail(email, otp) {
     const mailOptions = {
-        from: '"Weblix Support" <mdshihab999777@gmail.com>',
+        from: `"Weblix Support" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'Password Reset Code - Weblix',
         html: `
@@ -106,7 +117,6 @@ app.post('/send-otp', emailLimiter, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid email format' });
         }
         
-        // Check existing attempts
         const existing = otpStore.get(email);
         if (existing && existing.attempts >= 3) {
             return res.status(429).json({ success: false, error: 'Too many attempts. Please try after 10 minutes.' });
@@ -125,12 +135,12 @@ app.post('/send-otp', emailLimiter, async (req, res) => {
         setTimeout(() => otpStore.delete(email), 10 * 60 * 1000);
         
         await sendOTPEmail(email, otp);
-        console.log(`OTP sent to ${email}: ${otp}`);
+        console.log(`✅ OTP sent to ${email}: ${otp}`);
         
         res.json({ success: true, message: 'OTP sent successfully to your email' });
         
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
@@ -159,9 +169,7 @@ app.post('/verify', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid OTP. Please try again.' });
         }
         
-        // Generate reset token
         const resetToken = Buffer.from(`${email}:${Date.now()}`).toString('base64');
-        
         otpStore.delete(email);
         
         res.json({ 
@@ -171,7 +179,7 @@ app.post('/verify', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
@@ -186,7 +194,7 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Weblix API running on port ${PORT}`);
-    console.log(`📧 Email service ready (mdshihab999777@gmail.com)`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📧 Email service using: ${process.env.EMAIL_USER || 'NOT SET'}`);
     console.log(`✅ Health check: http://localhost:${PORT}/health`);
 });
