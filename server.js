@@ -1,6 +1,3 @@
-// Load environment variables first (সবচেয়ে শুরুতে)
-require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
@@ -8,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// ✅ Render এ proxy trust enable করুন (এই লাইন যোগ করুন)
+// ✅ Render এ proxy trust enable করুন
 app.set('trust proxy', 1);
 
 // Middleware
@@ -18,30 +15,24 @@ app.use(express.json());
 // Store OTPs in memory
 const otpStore = new Map();
 
-// Check if email credentials are configured
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error('❌ EMAIL_USER or EMAIL_PASS environment variables are not set!');
-    console.error('Please set them in Render Dashboard');
-} else {
-    console.log('✅ Email credentials loaded from environment variables');
-}
+// ✅ Email configuration (সরাসরি কোডে credentials বসানো)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'mdshihab999777@gmail.com',
+        pass: 'wyzcaotqkgqivzdo'
+    }
+});
 
-// ✅ Rate limiting (সঠিকভাবে কনফিগার)
+console.log('✅ Email credentials loaded');
+
+// Rate limiting
 const emailLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 3,
     message: { success: false, error: 'Too many requests. Please wait a minute.' },
-    skip: (req) => req.method === 'OPTIONS',  // Preflight requests skip
-    validate: { trustProxy: false }  // এই লাইনটি যোগ করুন
-});
-
-// Email configuration
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
+    skip: (req) => req.method === 'OPTIONS',
+    validate: { trustProxy: false }
 });
 
 // Generate 6-digit OTP
@@ -52,7 +43,7 @@ function generateOTP() {
 // Send email with OTP
 async function sendOTPEmail(email, otp) {
     const mailOptions = {
-        from: `"Weblix Support" <${process.env.EMAIL_USER}>`,
+        from: '"Weblix Support" <mdshihab999777@gmail.com>',
         to: email,
         subject: '🔐 Password Reset Code - Weblix',
         html: `
@@ -182,9 +173,9 @@ setInterval(() => {
     }
 }, 60 * 1000);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📧 Email service using: ${process.env.EMAIL_USER || 'NOT SET'}`);
-    console.log(`✅ Health check: http://localhost:${PORT}/health`);
+    console.log(`📧 Email service using: mdshihab999777@gmail.com`);
+    console.log(`✅ Health check: https://weblix-server.onrender.com/health`);
 });
