@@ -5,9 +5,6 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// ✅ Render এ proxy trust enable করুন
-app.set('trust proxy', 1);
-
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -15,7 +12,7 @@ app.use(express.json());
 // Store OTPs in memory
 const otpStore = new Map();
 
-// ✅ Email configuration (সরাসরি কোডে credentials বসানো)
+// Email configuration (সরাসরি কোডে credentials বসানো)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -30,9 +27,7 @@ console.log('✅ Email credentials loaded');
 const emailLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 3,
-    message: { success: false, error: 'Too many requests. Please wait a minute.' },
-    skip: (req) => req.method === 'OPTIONS',
-    validate: { trustProxy: false }
+    message: { success: false, error: 'Too many requests. Please wait a minute.' }
 });
 
 // Generate 6-digit OTP
@@ -173,9 +168,9 @@ setInterval(() => {
     }
 }, 60 * 1000);
 
-const PORT = process.env.PORT || 10000;
+const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📧 Email service using: mdshihab999777@gmail.com`);
-    console.log(`✅ Health check: https://weblix-server.onrender.com/health`);
+    console.log(`✅ Health check: http://localhost:${PORT}/health`);
 });
