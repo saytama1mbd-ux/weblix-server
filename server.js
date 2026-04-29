@@ -1,0 +1,192 @@
+const express = require('express');
+const cors = require('cors');
+const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Store OTPs in memory
+const otpStore = new Map();
+
+// Rate limiting
+const emailLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 3,
+    message: { success: false, error: 'Too many requests. Please wait a minute.' }
+});
+
+// Email configuration (YOUR credentials are set here)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'mdshihab999777@gmail.com',
+        pass: 'wyzcaotqkgqivzdo'
+    }
+});
+
+// Generate 6-digit OTP
+function generateOTP() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Send email with OTP
+async function sendOTPEmail(email, otp) {
+    const mailOptions = {
+        from: '"Weblix Support" <mdshihab999777@gmail.com>',
+        to: email,
+        subject: 'Password Reset Code - Weblix',
+        html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Password Reset Code</title>
+                <style>
+                    body { margin: 0; padding: 0; background: #0C0B19; font-family: 'Segoe UI', Arial, sans-serif; }
+                    .container { max-width: 450px; margin: 50px auto; background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%); border-radius: 24px; padding: 40px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+                    .logo { width: 70px; height: 70px; background: #6200EE; border-radius: 20px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; }
+                    h1 { color: #6200EE; margin: 0; font-size: 32px; }
+                    .code-box { background: #0C0B19; border-radius: 16px; padding: 20px; margin: 25px 0; }
+                    .code { font-size: 36px; letter-spacing: 8px; font-weight: bold; color: #6200EE; font-family: monospace; }
+                    .warning { color: #FF6D00; font-size: 12px; margin-top: 15px; }
+                    .footer { color: #606070; font-size: 11px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="logo">🔐</div>
+                    <h1>Weblix</h1>
+                    <p style="color: #A0A0B0; margin: 10px 0 0;">Password Reset Request</p>
+                    <div class="code-box">
+                        <p style="color: #FFFFFF; margin: 0 0 10px;">Your verification code is:</p>
+                        <div class="code">${otp}</div>
+                        <p style="color: #808090; font-size: 12px; margin: 15px 0 0;">This code expires in 10 minutes</p>
+                    </div>
+                    <p style="color: #A0A0B0; font-size: 13px;">Enter this code in the app to reset your password.</p>
+                    <p class="warning">⚠️ Never share this code with anyone</p>
+                    <div class="footer">
+                        <p>&copy; 2024 Weblix. All rights reserved.</p>
+                        <p>If you didn't request this, please ignore this email.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `,
+        text: `Your Weblix password reset code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
+    };
+    
+    await transporter.sendMail(mailOptions);
+}
+
+// ==================== API ENDPOINTS ====================
+
+app.get('/', (req, res) => {
+    res.json({ status: 'running', message: 'Weblix Password Reset API is active' });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Send OTP endpoint
+app.post('/send-otp', emailLimiter, async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({ success: false, error: 'Email is required' });
+        }
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ success: false, error: 'Invalid email format' });
+        }
+        
+        // Check existing attempts
+        const existing = otpStore.get(email);
+        if (existing && existing.attempts >= 3) {
+            return res.status(429).json({ success: false, error: 'Too many attempts. Please try after 10 minutes.' });
+        }
+        
+        const otp = generateOTP();
+        const expiresAt = Date.now() + 10 * 60 * 1000;
+        
+        otpStore.set(email, {
+            otp: otp,
+            expiresAt: expiresAt,
+            attempts: (existing?.attempts || 0) + 1,
+            createdAt: Date.now()
+        });
+        
+        setTimeout(() => otpStore.delete(email), 10 * 60 * 1000);
+        
+        await sendOTPEmail(email, otp);
+        console.log(`OTP sent to ${email}: ${otp}`);
+        
+        res.json({ success: true, message: 'OTP sent successfully to your email' });
+        
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// Verify OTP endpoint
+app.post('/verify', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        
+        if (!email || !otp) {
+            return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+        }
+        
+        const storedData = otpStore.get(email);
+        
+        if (!storedData) {
+            return res.status(400).json({ success: false, error: 'No OTP request found. Please request a new code.' });
+        }
+        
+        if (Date.now() > storedData.expiresAt) {
+            otpStore.delete(email);
+            return res.status(400).json({ success: false, error: 'OTP expired. Please request a new code.' });
+        }
+        
+        if (storedData.otp !== otp) {
+            return res.status(400).json({ success: false, error: 'Invalid OTP. Please try again.' });
+        }
+        
+        // Generate reset token
+        const resetToken = Buffer.from(`${email}:${Date.now()}`).toString('base64');
+        
+        otpStore.delete(email);
+        
+        res.json({ 
+            success: true, 
+            message: 'OTP verified successfully',
+            resetToken: resetToken
+        });
+        
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// Clean up expired OTPs every minute
+setInterval(() => {
+    const now = Date.now();
+    for (const [email, data] of otpStore.entries()) {
+        if (now > data.expiresAt) otpStore.delete(email);
+    }
+}, 60 * 1000);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Weblix API running on port ${PORT}`);
+    console.log(`📧 Email service ready (mdshihab999777@gmail.com)`);
+    console.log(`✅ Health check: http://localhost:${PORT}/health`);
+});
