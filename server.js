@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// ✅ Render এ proxy trust enable করুন (এই লাইন যোগ করুন)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -23,14 +26,16 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.log('✅ Email credentials loaded from environment variables');
 }
 
-// Rate limiting
+// ✅ Rate limiting (সঠিকভাবে কনফিগার)
 const emailLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 3,
-    message: { success: false, error: 'Too many requests. Please wait a minute.' }
+    message: { success: false, error: 'Too many requests. Please wait a minute.' },
+    skip: (req) => req.method === 'OPTIONS',  // Preflight requests skip
+    validate: { trustProxy: false }  // এই লাইনটি যোগ করুন
 });
 
-// Email configuration (Render Dashboard এর credentials ব্যবহার করে)
+// Email configuration
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -44,7 +49,7 @@ function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send email with OTP (সুন্দর স্টাইল)
+// Send email with OTP
 async function sendOTPEmail(email, otp) {
     const mailOptions = {
         from: `"Weblix Support" <${process.env.EMAIL_USER}>`,
