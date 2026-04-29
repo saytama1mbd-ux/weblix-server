@@ -18,9 +18,9 @@ const otpStore = new Map();
 // Check if email credentials are configured
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.error('❌ EMAIL_USER or EMAIL_PASS environment variables are not set!');
-    console.error('Please create .env file or set them in Render Dashboard');
+    console.error('Please set them in Render Dashboard');
 } else {
-    console.log('✅ Email credentials loaded from .env file');
+    console.log('✅ Email credentials loaded from environment variables');
 }
 
 // Rate limiting
@@ -30,7 +30,7 @@ const emailLimiter = rateLimit({
     message: { success: false, error: 'Too many requests. Please wait a minute.' }
 });
 
-// Email configuration (Environment Variable ব্যবহার করে)
+// Email configuration (Render Dashboard এর credentials ব্যবহার করে)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -44,50 +44,35 @@ function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send email with OTP
+// Send email with OTP (সুন্দর স্টাইল)
 async function sendOTPEmail(email, otp) {
     const mailOptions = {
         from: `"Weblix Support" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: 'Password Reset Code - Weblix',
+        subject: '🔐 Password Reset Code - Weblix',
         html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Password Reset Code</title>
-                <style>
-                    body { margin: 0; padding: 0; background: #0C0B19; font-family: 'Segoe UI', Arial, sans-serif; }
-                    .container { max-width: 450px; margin: 50px auto; background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%); border-radius: 24px; padding: 40px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-                    .logo { width: 70px; height: 70px; background: #6200EE; border-radius: 20px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; }
-                    h1 { color: #6200EE; margin: 0; font-size: 32px; }
-                    .code-box { background: #0C0B19; border-radius: 16px; padding: 20px; margin: 25px 0; }
-                    .code { font-size: 36px; letter-spacing: 8px; font-weight: bold; color: #6200EE; font-family: monospace; }
-                    .warning { color: #FF6D00; font-size: 12px; margin-top: 15px; }
-                    .footer { color: #606070; font-size: 11px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="logo">🔐</div>
-                    <h1>Weblix</h1>
-                    <p style="color: #A0A0B0; margin: 10px 0 0;">Password Reset Request</p>
-                    <div class="code-box">
-                        <p style="color: #FFFFFF; margin: 0 0 10px;">Your verification code is:</p>
-                        <div class="code">${otp}</div>
-                        <p style="color: #808090; font-size: 12px; margin: 15px 0 0;">This code expires in 10 minutes</p>
+            <div style="background:#0C0B19; padding:40px 20px; font-family:Arial,sans-serif;">
+                <div style="max-width:450px; margin:0 auto; background:linear-gradient(135deg,#1A1A2E 0%,#16213E 100%); border-radius:24px; padding:35px; text-align:center;">
+                    <div style="font-size:48px; margin-bottom:15px;">🔐</div>
+                    <h1 style="color:#6200EE; margin:0; font-size:28px;">Weblix</h1>
+                    <p style="color:#A0A0B0; margin:10px 0 20px;">Password Reset Request</p>
+                    
+                    <div style="background:#0C0B19; border-radius:16px; padding:20px; margin:20px 0;">
+                        <p style="color:#FFFFFF; margin:0 0 10px;">Your verification code is:</p>
+                        <div style="font-size:36px; letter-spacing:5px; font-weight:bold; color:#6200EE; font-family:monospace;">${otp}</div>
+                        <p style="color:#808090; font-size:12px; margin:15px 0 0;">⏰ Expires in 10 minutes</p>
                     </div>
-                    <p style="color: #A0A0B0; font-size: 13px;">Enter this code in the app to reset your password.</p>
-                    <p class="warning">⚠️ Never share this code with anyone</p>
-                    <div class="footer">
-                        <p>&copy; 2024 Weblix. All rights reserved.</p>
-                        <p>If you didn't request this, please ignore this email.</p>
+                    
+                    <p style="color:#A0A0B0; font-size:13px;">Enter this code in the app to reset your password.</p>
+                    <p style="color:#FF6D00; font-size:12px; margin-top:15px;">⚠️ Never share this code with anyone</p>
+                    
+                    <div style="border-top:1px solid #333; margin-top:25px; padding-top:20px;">
+                        <p style="color:#606070; font-size:11px;">&copy; 2024 Weblix. All rights reserved.</p>
                     </div>
                 </div>
-            </body>
-            </html>
+            </div>
         `,
-        text: `Your Weblix password reset code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
+        text: `Weblix Password Reset\n\nYour OTP code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
     };
     
     await transporter.sendMail(mailOptions);
